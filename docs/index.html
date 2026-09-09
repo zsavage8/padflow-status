@@ -163,7 +163,7 @@
     rows.forEach(function(r){ if (byComp[r.c]) byComp[r.c].push(r); });
 
     var latestT = rows.length ? rows[rows.length-1].t : 0;
-    var fresh = now - latestT < 6 * CHECK_MS;
+    var fresh = now - latestT < 9 * CHECK_MS;
     var latestByComp = {}, anyDown = false, appDown = false;
     COMPONENTS.forEach(function(c){
       var a = byComp[c.key]; var last = a.length ? a[a.length-1] : null;
