@@ -5,93 +5,333 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PadFlow Status</title>
 <style>
-  :root { color-scheme: light dark;
-    --bg:#fafaf8; --ink:#1a1d21; --mid:#5b6470; --line:#e4e2dc; --card:#ffffff;
-    --up:#2e9e5b; --warn:#d99a1f; --down:#cc3b3b; }
-  @media (prefers-color-scheme: dark) { :root {
-    --bg:#111417; --ink:#e8eaed; --mid:#9aa5b5; --line:#2a2f36; --card:#181c21; } }
-  * { box-sizing: border-box; }
-  body { margin:0; background:var(--bg); color:var(--ink);
-    font:15px/1.5 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-  main { max-width:720px; margin:0 auto; padding:48px 20px 64px; }
-  h1 { font-size:22px; margin:0 0 4px; }
-  .sub { color:var(--mid); margin:0 0 28px; font-size:13px; }
-  .pill { display:inline-flex; align-items:center; gap:8px; padding:10px 16px; border-radius:8px;
-    font-weight:600; font-size:16px; background:var(--card); border:1px solid var(--line); }
-  .dot { width:10px; height:10px; border-radius:50%; }
-  .metrics { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; margin:24px 0; }
-  .m { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:14px 16px; }
-  .m b { display:block; font-size:20px; }
-  .m span { color:var(--mid); font-size:12px; }
-  .bars { display:flex; gap:2px; margin:8px 0 4px; height:34px; align-items:flex-end; }
-  .bars i { flex:1; border-radius:2px; min-width:2px; }
-  .legend { display:flex; justify-content:space-between; color:var(--mid); font-size:12px; }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:16px; margin-top:24px; }
-  footer { margin-top:36px; color:var(--mid); font-size:12px; }
-  a { color:inherit; }
+  :root {
+    color-scheme: light;
+    --plane:#f9f9f7; --surface:#fcfcfb;
+    --ink:#0b0b0b; --ink2:#52514e; --muted:#898781;
+    --grid:#e1e0d9; --baseline:#c3c2b7; --border:rgba(11,11,11,.10);
+    --good:#0ca30c; --warn:#fab219; --crit:#d03b3b;
+    --series1:#2a78d6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --plane:#0d0d0d; --surface:#1a1a19;
+      --ink:#ffffff; --ink2:#c3c2b7; --muted:#898781;
+      --grid:#2c2c2a; --baseline:#383835; --border:rgba(255,255,255,.10);
+      --series1:#3987e5;
+    }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--plane); color:var(--ink);
+    font:15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width:880px; margin:0 auto; padding:40px 20px 72px; }
+  header { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:26px; }
+  .brand { font-size:20px; font-weight:700; letter-spacing:-.01em; }
+  .brand span { color:var(--ink2); font-weight:400; }
+  header a { color:var(--ink2); font-size:13px; text-decoration:none; border-bottom:1px solid var(--border); }
+  header a:hover { color:var(--ink); }
+
+  .banner { display:flex; align-items:center; gap:12px; padding:16px 18px;
+    background:var(--surface); border:1px solid var(--border); border-radius:10px; }
+  .banner svg { flex:none; }
+  .banner b { font-size:17px; }
+  .banner .sub { color:var(--ink2); font-size:13px; margin-top:1px; }
+
+  .tiles { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px; margin:14px 0 26px; }
+  .tile { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:14px 16px 12px; }
+  .tile b { display:block; font-size:22px; font-weight:650; letter-spacing:-.01em; }
+  .tile span { color:var(--ink2); font-size:12px; }
+
+  h2 { font-size:13px; font-weight:600; letter-spacing:.04em; text-transform:uppercase;
+    color:var(--ink2); margin:30px 0 10px; }
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:18px; }
+  .comp + .comp { margin-top:18px; padding-top:18px; border-top:1px solid var(--grid); }
+  .comp .row { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; }
+  .comp .name { font-weight:600; }
+  .comp .desc { color:var(--muted); font-size:12px; margin-left:8px; font-weight:400; }
+  .state { display:inline-flex; align-items:center; gap:6px; font-size:13px; color:var(--ink2); }
+  .bars { display:flex; gap:2px; height:30px; align-items:stretch; }
+  .bars i { flex:1; min-width:2px; border-radius:2px; background:var(--grid); }
+  .bars i:hover { outline:2px solid var(--baseline); outline-offset:1px; }
+  .axis { display:flex; justify-content:space-between; color:var(--muted); font-size:11px; margin-top:6px; }
+
+  .chartwrap { position:relative; }
+  .chartwrap svg { display:block; width:100%; height:180px; }
+  .tip { position:absolute; pointer-events:none; background:var(--surface); border:1px solid var(--border);
+    border-radius:8px; padding:7px 10px; font-size:12px; color:var(--ink); box-shadow:0 4px 14px rgba(0,0,0,.12);
+    white-space:nowrap; transform:translate(-50%,-110%); display:none; }
+  .tip b { font-variant-numeric:tabular-nums; }
+
+  table { width:100%; border-collapse:collapse; font-size:13.5px; }
+  th { text-align:left; color:var(--ink2); font-weight:600; font-size:12px; letter-spacing:.02em;
+    padding:6px 10px 8px; border-bottom:1px solid var(--grid); }
+  td { padding:9px 10px; border-bottom:1px solid var(--grid); font-variant-numeric:tabular-nums; }
+  tr:last-child td { border-bottom:none; }
+  td .state { font-size:13px; }
+  .empty { color:var(--ink2); padding:8px 2px; font-size:14px; }
+
+  footer { margin-top:34px; color:var(--muted); font-size:12px; line-height:1.7; }
+  footer a { color:var(--ink2); }
+  @media (max-width:560px) { .tiles { grid-template-columns:repeat(2,1fr); } .banner b { font-size:15px; } }
 </style>
 </head>
 <body>
 <main>
-  <h1>PadFlow Status</h1>
-  <p class="sub">Live availability of <a href="https://padflow.io">padflow.io</a>, checked every five minutes from an independent monitor.</p>
-  <div class="pill" id="pill"><span class="dot" id="dot" style="background:var(--mid)"></span><span id="state">Loading…</span></div>
-  <div class="metrics">
-    <div class="m"><b id="u24">–</b><span>uptime, last 24 h</span></div>
-    <div class="m"><b id="u7">–</b><span>uptime, last 7 days</span></div>
-    <div class="m"><b id="u90">–</b><span>uptime, last 90 days</span></div>
-    <div class="m"><b id="rt">–</b><span>median response</span></div>
+  <header>
+    <div class="brand">PadFlow <span>Status</span></div>
+    <a href="https://padflow.io">padflow.io</a>
+  </header>
+
+  <div class="banner" id="banner">
+    <span id="bannerIcon"></span>
+    <div><b id="bannerText">Loading current status…</b>
+      <div class="sub" id="bannerSub">Checked every five minutes from an independent monitor.</div></div>
   </div>
+
+  <div class="tiles" id="tiles"></div>
+
+  <h2>Components</h2>
+  <div class="card" id="components"><div class="empty">Loading…</div></div>
+
+  <h2>Response time — application, last 24 hours</h2>
   <div class="card">
-    <div class="bars" id="bars"></div>
-    <div class="legend"><span id="firstDay">–</span><span>daily uptime</span><span>today</span></div>
+    <div class="chartwrap" id="chartwrap">
+      <svg id="chart" viewBox="0 0 860 180" preserveAspectRatio="none" aria-label="Application response time over the last 24 hours"></svg>
+      <div class="tip" id="tip"></div>
+    </div>
   </div>
-  <footer id="foot">Loading history…</footer>
+
+  <h2>Incidents — last 90 days</h2>
+  <div class="card" id="incidents"><div class="empty">Loading…</div></div>
+
+  <footer id="foot">
+    Monitored from GitHub's infrastructure, independent of PadFlow's own hosting, every five minutes with one automatic retry per check.<br>
+    <a href="data/history.csv">Raw monitoring data</a> · Support: <a href="mailto:support@padflow.io">support@padflow.io</a>
+  </footer>
 </main>
+
 <script>
-(async function () {
-  function pct(n){ return n === null ? "–" : (n >= 99.995 ? "100%" : n.toFixed(2) + "%"); }
-  try {
-    const txt = await (await fetch("data/history.csv", {cache:"no-store"})).text();
-    const rows = txt.split("\n").filter(l => l && l[0] !== "#").map(l => {
-      const p = l.split(",");
-      return { t: Date.parse(p[0]), code: p[1], s: parseFloat(p[2]), up: p[3] === "1" };
-    }).filter(r => !isNaN(r.t));
-    if (!rows.length) { document.getElementById("state").textContent = "Monitor warming up"; 
-      document.getElementById("foot").textContent = "First checks arrive within minutes of deployment."; return; }
-    const now = Date.now(), last = rows[rows.length - 1];
-    const win = ms => { const s = rows.filter(r => now - r.t <= ms);
-      return s.length ? 100 * s.filter(r => r.up).length / s.length : null; };
-    document.getElementById("u24").textContent = pct(win(864e5));
-    document.getElementById("u7").textContent  = pct(win(7 * 864e5));
-    document.getElementById("u90").textContent = pct(win(90 * 864e5));
-    const times = rows.filter(r => r.up && now - r.t <= 7 * 864e5).map(r => r.s).sort((a, b) => a - b);
-    document.getElementById("rt").textContent = times.length ? Math.round(times[times.length >> 1] * 1000) + " ms" : "–";
-    const fresh = now - last.t < 30 * 60000;
-    const upNow = last.up && fresh;
-    const dot = document.getElementById("dot"), state = document.getElementById("state");
-    if (upNow) { dot.style.background = "var(--up)"; state.textContent = "All systems operational"; }
-    else if (!fresh) { dot.style.background = "var(--warn)"; state.textContent = "Monitor data is stale"; }
-    else { dot.style.background = "var(--down)"; state.textContent = "padflow.io is not responding"; }
-    const byDay = {};
-    rows.forEach(r => { const d = new Date(r.t).toISOString().slice(0, 10);
-      (byDay[d] = byDay[d] || []).push(r.up); });
-    const days = Object.keys(byDay).sort().slice(-90);
-    const bars = document.getElementById("bars");
-    days.forEach(d => {
-      const s = byDay[d], u = 100 * s.filter(Boolean).length / s.length;
-      const i = document.createElement("i");
-      i.style.height = "100%";
-      i.style.background = u >= 99 ? "var(--up)" : u >= 95 ? "var(--warn)" : "var(--down)";
-      i.title = d + " — " + u.toFixed(1) + "% up (" + s.length + " checks)";
-      bars.appendChild(i);
-    });
-    document.getElementById("firstDay").textContent = days[0] || "–";
-    document.getElementById("foot").textContent = "Last check " + new Date(last.t).toUTCString() +
-      " — HTTP " + last.code + " in " + Math.round(last.s * 1000) + " ms. Support: support@padflow.io";
-  } catch (e) {
-    document.getElementById("state").textContent = "Status data unavailable";
+(function () {
+  "use strict";
+  var COMPONENTS = [
+    { key:"app",  name:"Application",   desc:"padflow.io" },
+    { key:"api",  name:"API & database", desc:"application health endpoint" },
+    { key:"docs", name:"Documentation", desc:"padflow.io/docs" }
+  ];
+  var CHECK_MS = 5 * 60000, DAY = 86400000;
+
+  function icon(kind, size) {
+    var s = size || 22;
+    var common = 'width="'+s+'" height="'+s+'" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
+    if (kind === "good") return '<svg '+common+' stroke="var(--good)"><circle cx="12" cy="12" r="9"></circle><path d="M8.5 12.5l2.5 2.5 4.5-5"></path></svg>';
+    if (kind === "warn") return '<svg '+common+' stroke="var(--warn)"><path d="M12 3.5L21.5 20h-19z"></path><path d="M12 10v4"></path><path d="M12 17.2v.1"></path></svg>';
+    if (kind === "crit") return '<svg '+common+' stroke="var(--crit)"><circle cx="12" cy="12" r="9"></circle><path d="M9 9l6 6M15 9l-6 6"></path></svg>';
+    return '<svg '+common+' stroke="var(--muted)"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>';
   }
+  function stateHtml(kind, label) { return '<span class="state">'+icon(kind,15)+label+'</span>'; }
+  function pct(n) { return n === null ? "–" : (n >= 99.995 ? "100%" : n.toFixed(2) + "%"); }
+  function esc(s) { return String(s).replace(/[&<>"]/g, function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];}); }
+  function fmtDur(ms) {
+    var m = Math.round(ms / 60000);
+    if (m < 60) return m + " min";
+    var h = Math.floor(m / 60); m = m % 60;
+    return h + " h" + (m ? " " + m + " min" : "");
+  }
+  function fmtTime(t) {
+    return new Date(t).toLocaleString(undefined, { month:"short", day:"numeric", hour:"numeric", minute:"2-digit" });
+  }
+
+  function parse(txt) {
+    var rows = [];
+    txt.split("\n").forEach(function (l) {
+      if (!l || l[0] === "#") return;
+      var p = l.split(",");
+      var r = null;
+      if (p.length === 5) r = { t:Date.parse(p[0]), c:p[1], code:p[2], s:parseFloat(p[3]), up:p[4].trim()==="1" };
+      else if (p.length === 4) r = { t:Date.parse(p[0]), c:"app", code:p[1], s:parseFloat(p[2]), up:p[3].trim()==="1" };
+      if (r && !isNaN(r.t) && !isNaN(r.s)) rows.push(r);
+    });
+    rows.sort(function(a,b){ return a.t - b.t; });
+    return rows;
+  }
+
+  function render(rows) {
+    var now = Date.now();
+    var byComp = {};
+    COMPONENTS.forEach(function(c){ byComp[c.key] = []; });
+    rows.forEach(function(r){ if (byComp[r.c]) byComp[r.c].push(r); });
+
+    var latestT = rows.length ? rows[rows.length-1].t : 0;
+    var fresh = now - latestT < 6 * CHECK_MS;
+    var latestByComp = {}, anyDown = false, appDown = false;
+    COMPONENTS.forEach(function(c){
+      var a = byComp[c.key]; var last = a.length ? a[a.length-1] : null;
+      latestByComp[c.key] = last;
+      if (last && !last.up) { anyDown = true; if (c.key === "app") appDown = true; }
+    });
+    var bKind, bText, bSub;
+    if (!rows.length) { bKind="idle"; bText="Monitor warming up"; bSub="First checks arrive within minutes."; }
+    else if (!fresh) { bKind="warn"; bText="Monitor data is stale"; bSub="Last successful check was "+fmtDur(now-latestT)+" ago. PadFlow itself may be fine."; }
+    else if (appDown) { bKind="crit"; bText="Application outage"; bSub="padflow.io is not responding to the monitor. We are on it."; }
+    else if (anyDown) { bKind="warn"; bText="Partial outage"; bSub="Some components are not responding. The application is up."; }
+    else { bKind="good"; bText="All systems operational"; bSub="Every component answered the most recent check."; }
+    document.getElementById("bannerIcon").innerHTML = icon(bKind, 26);
+    document.getElementById("bannerText").textContent = bText;
+    document.getElementById("bannerSub").textContent = bSub;
+
+    function upWin(ms) {
+      var s = rows.filter(function(r){ return now - r.t <= ms; });
+      if (!s.length) return null;
+      return 100 * s.filter(function(r){ return r.up; }).length / s.length;
+    }
+    var appTimes = byComp.app.filter(function(r){ return r.up && now - r.t <= DAY; })
+                            .map(function(r){ return r.s; }).sort(function(a,b){ return a-b; });
+    function q(p){ return appTimes.length ? Math.round(appTimes[Math.min(appTimes.length-1, Math.floor(p*appTimes.length))]*1000)+" ms" : "–"; }
+    document.getElementById("tiles").innerHTML =
+      '<div class="tile"><b>'+pct(upWin(DAY))+'</b><span>uptime, 24 hours</span></div>' +
+      '<div class="tile"><b>'+pct(upWin(7*DAY))+'</b><span>uptime, 7 days</span></div>' +
+      '<div class="tile"><b>'+pct(upWin(90*DAY))+'</b><span>uptime, 90 days</span></div>' +
+      '<div class="tile"><b>'+q(0.5)+'</b><span>median response, 24 h</span></div>' +
+      '<div class="tile"><b>'+q(0.95)+'</b><span>p95 response, 24 h</span></div>';
+
+    var compHtml = COMPONENTS.map(function (c) {
+      var a = byComp[c.key], last = latestByComp[c.key];
+      var kind = !last || !fresh ? "idle" : (last.up ? "good" : "crit");
+      var label = !last ? "no data" : (!fresh ? "awaiting check" : (last.up ? "Operational" : "Down"));
+      var up90 = a.length ? 100 * a.filter(function(r){ return r.up; }).length / a.length : null;
+      var days = {};
+      a.forEach(function (r) {
+        var d = new Date(r.t).toISOString().slice(0,10);
+        (days[d] = days[d] || []).push(r.up);
+      });
+      var bars = "";
+      for (var i = 89; i >= 0; i--) {
+        var d = new Date(now - i*DAY).toISOString().slice(0,10);
+        var s = days[d];
+        var color = "var(--grid)", tt = d + " — no data";
+        if (s) {
+          var u = 100 * s.filter(Boolean).length / s.length;
+          color = u >= 99.5 ? "var(--good)" : u >= 95 ? "var(--warn)" : "var(--crit)";
+          tt = d + " — " + (u >= 99.995 ? "100" : u.toFixed(1)) + "% up · " + s.length + " checks";
+        }
+        bars += '<i style="background:'+color+'" title="'+esc(tt)+'" aria-label="'+esc(tt)+'"></i>';
+      }
+      return '<div class="comp"><div class="row">' +
+        '<span class="name">'+c.name+'<span class="desc">'+c.desc+'</span></span>' +
+        stateHtml(kind, label) + "</div>" +
+        '<div class="bars">'+bars+"</div>" +
+        '<div class="axis"><span>90 days ago</span><span>'+pct(up90)+' uptime</span><span>today</span></div></div>';
+    }).join("");
+    document.getElementById("components").innerHTML = compHtml;
+
+    var pts = byComp.app.filter(function(r){ return now - r.t <= DAY; });
+    var svg = document.getElementById("chart"), W = 860, H = 180, padL = 44, padR = 10, padT = 12, padB = 22;
+    if (svg && pts.length >= 2) {
+      var t0 = now - DAY, t1 = now;
+      var maxMs = Math.max(500, Math.ceil(Math.max.apply(null, pts.map(function(p){ return p.s*1000; })) / 250) * 250);
+      function X(t){ return padL + (W-padL-padR) * (t - t0) / (t1 - t0); }
+      function Y(ms){ return padT + (H-padT-padB) * (1 - ms/maxMs); }
+      var g = "";
+      [0.25,0.5,0.75].forEach(function(f){
+        g += '<line x1="'+padL+'" x2="'+(W-padR)+'" y1="'+Y(maxMs*f)+'" y2="'+Y(maxMs*f)+'" stroke="var(--grid)" stroke-width="1"/>';
+      });
+      g += '<line x1="'+padL+'" x2="'+(W-padR)+'" y1="'+Y(0)+'" y2="'+Y(0)+'" stroke="var(--baseline)" stroke-width="1"/>';
+      g += '<text x="'+(padL-6)+'" y="'+(Y(maxMs)+4)+'" text-anchor="end" font-size="11" fill="var(--muted)">'+maxMs+'</text>';
+      g += '<text x="'+(padL-6)+'" y="'+(Y(0)+4)+'" text-anchor="end" font-size="11" fill="var(--muted)">0 ms</text>';
+      g += '<text x="'+padL+'" y="'+(H-6)+'" font-size="11" fill="var(--muted)">'+fmtTime(t0)+'</text>';
+      g += '<text x="'+(W-padR)+'" y="'+(H-6)+'" text-anchor="end" font-size="11" fill="var(--muted)">now</text>';
+      var d = "", pen = false;
+      pts.forEach(function (p, i) {
+        if (i > 0 && p.t - pts[i-1].t > 3 * CHECK_MS) pen = false;
+        if (!p.up) { pen = false; return; }
+        d += (pen ? " L " : " M ") + X(p.t).toFixed(1) + " " + Y(p.s*1000).toFixed(1);
+        pen = true;
+      });
+      g += '<path d="'+d+'" fill="none" stroke="var(--series1)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>';
+      pts.forEach(function (p) {
+        if (!p.up) g += '<line x1="'+X(p.t).toFixed(1)+'" x2="'+X(p.t).toFixed(1)+'" y1="'+padT+'" y2="'+Y(0)+'" stroke="var(--crit)" stroke-width="2" opacity="0.55"/>';
+      });
+      g += '<line id="xh" y1="'+padT+'" y2="'+Y(0)+'" stroke="var(--baseline)" stroke-width="1" visibility="hidden"/>';
+      g += '<circle id="xdot" r="4" fill="var(--series1)" stroke="var(--surface)" stroke-width="2" visibility="hidden"/>';
+      svg.innerHTML = g;
+
+      var wrap = document.getElementById("chartwrap"), tip = document.getElementById("tip");
+      wrap.onmousemove = function (ev) {
+        var rect = svg.getBoundingClientRect();
+        var t = t0 + (t1 - t0) * ((ev.clientX - rect.left) / rect.width * W - padL) / (W - padL - padR);
+        var best = null;
+        pts.forEach(function(p){ if (!best || Math.abs(p.t-t) < Math.abs(best.t-t)) best = p; });
+        if (!best) return;
+        var xs = X(best.t), sx = rect.width / W;
+        var xh = document.getElementById("xh"), xd = document.getElementById("xdot");
+        xh.setAttribute("x1", xs); xh.setAttribute("x2", xs); xh.setAttribute("visibility", "visible");
+        tip.style.display = "block";
+        tip.style.left = (xs * sx) + "px";
+        tip.style.top = "8px";
+        if (best.up) {
+          xd.setAttribute("cx", xs); xd.setAttribute("cy", Y(best.s*1000)); xd.setAttribute("visibility", "visible");
+          tip.innerHTML = fmtTime(best.t) + " · <b>" + Math.round(best.s*1000) + " ms</b>";
+        } else {
+          xd.setAttribute("visibility", "hidden");
+          tip.innerHTML = fmtTime(best.t) + " · " + stateHtml("crit", "check failed (HTTP " + esc(best.code) + ")");
+        }
+      };
+      wrap.onmouseleave = function () {
+        tip.style.display = "none";
+        var xh = document.getElementById("xh"), xd = document.getElementById("xdot");
+        if (xh) xh.setAttribute("visibility", "hidden");
+        if (xd) xd.setAttribute("visibility", "hidden");
+      };
+    } else if (svg) {
+      svg.outerHTML = '<div class="empty">Not enough data yet — the chart appears after a few checks.</div>';
+    }
+
+    var incidents = [];
+    COMPONENTS.forEach(function (c) {
+      var a = byComp[c.key], start = null, lastBad = null, count = 0;
+      for (var i = 0; i <= a.length; i++) {
+        var r = a[i];
+        if (r && !r.up) { if (start === null) start = r.t; lastBad = r.t; count++; }
+        else if (start !== null) {
+          incidents.push({ comp:c.name, start:start, end:(r ? r.t : lastBad + CHECK_MS), checks:count,
+                           ongoing: !r && fresh });
+          start = null; count = 0;
+        }
+      }
+    });
+    incidents.sort(function(a,b){ return b.start - a.start; });
+    var inc = document.getElementById("incidents");
+    if (!incidents.length) {
+      inc.innerHTML = '<div class="empty">'+stateHtml("good","No incidents recorded in the last 90 days.")+'</div>';
+    } else {
+      inc.innerHTML = "<table><thead><tr><th>Component</th><th>Started</th><th>Duration</th><th>Status</th></tr></thead><tbody>" +
+        incidents.slice(0, 20).map(function (x) {
+          return "<tr><td>"+esc(x.comp)+"</td><td>"+fmtTime(x.start)+"</td><td>"+fmtDur(x.end-x.start)+
+            "</td><td>"+(x.ongoing ? stateHtml("crit","Ongoing") : stateHtml("good","Resolved"))+"</td></tr>";
+        }).join("") + "</tbody></table>";
+    }
+
+    var f = document.getElementById("foot");
+    if (rows.length) {
+      f.innerHTML = "Last check " + fmtDur(now - latestT) + " ago · page refreshes automatically.<br>" +
+        "Monitored from GitHub's infrastructure, independent of PadFlow's own hosting, every five minutes with one automatic retry per check.<br>" +
+        '<a href="data/history.csv">Raw monitoring data</a> · Support: <a href="mailto:support@padflow.io">support@padflow.io</a>';
+    }
+  }
+
+  function load() {
+    fetch("data/history.csv", { cache: "no-store" })
+      .then(function(r){ if (!r.ok) throw 0; return r.text(); })
+      .then(function(t){ render(parse(t)); })
+      .catch(function(){
+        document.getElementById("bannerIcon").innerHTML = icon("warn", 26);
+        document.getElementById("bannerText").textContent = "Status data unavailable";
+        document.getElementById("bannerSub").textContent = "The monitor's data file could not be loaded. PadFlow itself may be fine.";
+      });
+  }
+  load();
+  setInterval(load, 60000);
 })();
 </script>
 </body>

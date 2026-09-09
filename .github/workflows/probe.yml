@@ -13,19 +13,32 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: probe padflow.io
+      - name: probe components
         run: |
-          ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-          out=$(curl -o /dev/null -s -w "%{http_code} %{time_total}" --max-time 20 https://padflow.io/ || echo "000 20.0")
-          code=${out% *}
-          secs=${out#* }
-          up=0
-          if [ "$code" = "200" ]; then up=1; fi
+          set -u
           mkdir -p docs/data
-          echo "$ts,$code,$secs,$up" >> docs/data/history.csv
-          tail -n 26000 docs/data/history.csv > docs/data/history.tmp
+          ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          parts=""
+          check () {
+            name="$1"; url="$2"
+            up=0; code="000"; secs="20.000"
+            for attempt in 1 2; do
+              out=$(curl -L -o /dev/null -s -w "%{http_code} %{time_total}" --max-time 20 "$url" || echo "000 20.000")
+              code=${out% *}
+              secs=${out#* }
+              case "$code" in 2*) up=1 ;; esac
+              [ "$up" = "1" ] && break
+              sleep 10
+            done
+            echo "$ts,$name,$code,$secs,$up" >> docs/data/history.csv
+            parts="$parts{\"name\":\"$name\",\"code\":\"$code\",\"seconds\":$secs,\"up\":$up},"
+          }
+          check app "https://padflow.io/"
+          check api "https://padflow.io/api/health"
+          check docs "https://padflow.io/docs"
+          tail -n 78000 docs/data/history.csv > docs/data/history.tmp
           mv docs/data/history.tmp docs/data/history.csv
-          printf '{"ts":"%s","code":%s,"seconds":%s,"up":%s}\n' "$ts" "$code" "$secs" "$up" > docs/data/latest.json
+          printf '{"ts":"%s","components":[%s]}\n' "$ts" "${parts%,}" > docs/data/latest.json
       - name: commit
         run: |
           git config user.name "padflow-probe"
