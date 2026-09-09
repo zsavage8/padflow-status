@@ -1,0 +1,36 @@
+name: probe
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch: {}
+permissions:
+  contents: write
+concurrency:
+  group: probe
+  cancel-in-progress: false
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: probe padflow.io
+        run: |
+          ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          out=$(curl -o /dev/null -s -w "%{http_code} %{time_total}" --max-time 20 https://padflow.io/ || echo "000 20.0")
+          code=${out% *}
+          secs=${out#* }
+          up=0
+          if [ "$code" = "200" ]; then up=1; fi
+          mkdir -p docs/data
+          echo "$ts,$code,$secs,$up" >> docs/data/history.csv
+          tail -n 26000 docs/data/history.csv > docs/data/history.tmp
+          mv docs/data/history.tmp docs/data/history.csv
+          printf '{"ts":"%s","code":%s,"seconds":%s,"up":%s}\n' "$ts" "$code" "$secs" "$up" > docs/data/latest.json
+      - name: commit
+        run: |
+          git config user.name "padflow-probe"
+          git config user.email "probe@padflow.io"
+          git add docs/data
+          git commit -m "probe" || exit 0
+          git pull --rebase --autostash || true
+          git push

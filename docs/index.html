@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PadFlow Status</title>
+<style>
+  :root { color-scheme: light dark;
+    --bg:#fafaf8; --ink:#1a1d21; --mid:#5b6470; --line:#e4e2dc; --card:#ffffff;
+    --up:#2e9e5b; --warn:#d99a1f; --down:#cc3b3b; }
+  @media (prefers-color-scheme: dark) { :root {
+    --bg:#111417; --ink:#e8eaed; --mid:#9aa5b5; --line:#2a2f36; --card:#181c21; } }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink);
+    font:15px/1.5 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  main { max-width:720px; margin:0 auto; padding:48px 20px 64px; }
+  h1 { font-size:22px; margin:0 0 4px; }
+  .sub { color:var(--mid); margin:0 0 28px; font-size:13px; }
+  .pill { display:inline-flex; align-items:center; gap:8px; padding:10px 16px; border-radius:8px;
+    font-weight:600; font-size:16px; background:var(--card); border:1px solid var(--line); }
+  .dot { width:10px; height:10px; border-radius:50%; }
+  .metrics { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; margin:24px 0; }
+  .m { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:14px 16px; }
+  .m b { display:block; font-size:20px; }
+  .m span { color:var(--mid); font-size:12px; }
+  .bars { display:flex; gap:2px; margin:8px 0 4px; height:34px; align-items:flex-end; }
+  .bars i { flex:1; border-radius:2px; min-width:2px; }
+  .legend { display:flex; justify-content:space-between; color:var(--mid); font-size:12px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:16px; margin-top:24px; }
+  footer { margin-top:36px; color:var(--mid); font-size:12px; }
+  a { color:inherit; }
+</style>
+</head>
+<body>
+<main>
+  <h1>PadFlow Status</h1>
+  <p class="sub">Live availability of <a href="https://padflow.io">padflow.io</a>, checked every five minutes from an independent monitor.</p>
+  <div class="pill" id="pill"><span class="dot" id="dot" style="background:var(--mid)"></span><span id="state">Loading…</span></div>
+  <div class="metrics">
+    <div class="m"><b id="u24">–</b><span>uptime, last 24 h</span></div>
+    <div class="m"><b id="u7">–</b><span>uptime, last 7 days</span></div>
+    <div class="m"><b id="u90">–</b><span>uptime, last 90 days</span></div>
+    <div class="m"><b id="rt">–</b><span>median response</span></div>
+  </div>
+  <div class="card">
+    <div class="bars" id="bars"></div>
+    <div class="legend"><span id="firstDay">–</span><span>daily uptime</span><span>today</span></div>
+  </div>
+  <footer id="foot">Loading history…</footer>
+</main>
+<script>
+(async function () {
+  function pct(n){ return n === null ? "–" : (n >= 99.995 ? "100%" : n.toFixed(2) + "%"); }
+  try {
+    const txt = await (await fetch("data/history.csv", {cache:"no-store"})).text();
+    const rows = txt.split("\n").filter(l => l && l[0] !== "#").map(l => {
+      const p = l.split(",");
+      return { t: Date.parse(p[0]), code: p[1], s: parseFloat(p[2]), up: p[3] === "1" };
+    }).filter(r => !isNaN(r.t));
+    if (!rows.length) { document.getElementById("state").textContent = "Monitor warming up"; 
+      document.getElementById("foot").textContent = "First checks arrive within minutes of deployment."; return; }
+    const now = Date.now(), last = rows[rows.length - 1];
+    const win = ms => { const s = rows.filter(r => now - r.t <= ms);
+      return s.length ? 100 * s.filter(r => r.up).length / s.length : null; };
+    document.getElementById("u24").textContent = pct(win(864e5));
+    document.getElementById("u7").textContent  = pct(win(7 * 864e5));
+    document.getElementById("u90").textContent = pct(win(90 * 864e5));
+    const times = rows.filter(r => r.up && now - r.t <= 7 * 864e5).map(r => r.s).sort((a, b) => a - b);
+    document.getElementById("rt").textContent = times.length ? Math.round(times[times.length >> 1] * 1000) + " ms" : "–";
+    const fresh = now - last.t < 30 * 60000;
+    const upNow = last.up && fresh;
+    const dot = document.getElementById("dot"), state = document.getElementById("state");
+    if (upNow) { dot.style.background = "var(--up)"; state.textContent = "All systems operational"; }
+    else if (!fresh) { dot.style.background = "var(--warn)"; state.textContent = "Monitor data is stale"; }
+    else { dot.style.background = "var(--down)"; state.textContent = "padflow.io is not responding"; }
+    const byDay = {};
+    rows.forEach(r => { const d = new Date(r.t).toISOString().slice(0, 10);
+      (byDay[d] = byDay[d] || []).push(r.up); });
+    const days = Object.keys(byDay).sort().slice(-90);
+    const bars = document.getElementById("bars");
+    days.forEach(d => {
+      const s = byDay[d], u = 100 * s.filter(Boolean).length / s.length;
+      const i = document.createElement("i");
+      i.style.height = "100%";
+      i.style.background = u >= 99 ? "var(--up)" : u >= 95 ? "var(--warn)" : "var(--down)";
+      i.title = d + " — " + u.toFixed(1) + "% up (" + s.length + " checks)";
+      bars.appendChild(i);
+    });
+    document.getElementById("firstDay").textContent = days[0] || "–";
+    document.getElementById("foot").textContent = "Last check " + new Date(last.t).toUTCString() +
+      " — HTTP " + last.code + " in " + Math.round(last.s * 1000) + " ms. Support: support@padflow.io";
+  } catch (e) {
+    document.getElementById("state").textContent = "Status data unavailable";
+  }
+})();
+</script>
+</body>
+</html>
