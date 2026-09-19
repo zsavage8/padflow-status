@@ -1,1 +1,1 @@
-{"ts":"2026-09-19T18:35:02Z","components":[{"name":"app","code":"200","seconds":0.159294,"up":1},{"name":"api","code":"200","seconds":0.123356,"up":1},{"name":"docs","code":"200","seconds":0.113022,"up":1}]}
+{"ts":"2026-09-19T18:35:02Z","components":[{"name":"app","code":"200","seconds":0.644,"up":1},{"name":"api","code":"200","seconds":0.05,"up":1},{"name":"docs","code":"200","seconds":0.327,"up":1}]}
